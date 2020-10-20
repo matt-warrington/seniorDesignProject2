@@ -4,28 +4,28 @@ close all
 clc
 
 %% Check Camera List (may have to install MATLAB package)
-cam_list = webcamlist;
-cam_name = cam_list{2}; % Change index to 1 to use your laptop's webcam
+cam_list = webcamlist
+cam_name = cam_list{1};
 cam = webcam(cam_name);
 preview(cam)
- 
+
+%% Read in rectangle reference point template
+rect = imread('rectangleReferencePoint.png');
+
 %% Take Snapshot
 x = input('Hit enter to take original image\n');
 closePreview(cam)
 [Image_Orig, img] = snapshot(cam);
 preview(cam)
- 
+
+%% Use rectangle template to get well locations
+
 %% Take another snapshot
 x = input('Hit enter to take original image\n');
 closePreview(cam)
 [Image_Background, img2] = snapshot(cam);
 
-%Image_Orig = imread('StickersWithNoise.png');
-%Image_Background = imread('NoiseBackground.png');
-
 %% Read in Original and Background Images
-%Image_Orig = imread('StickersWithNoise.png');
-%Image_Background = imread('NoiseBackground.png');
 [height,width,depth] = size(Image_Orig);
 [height_b,width_b,depth_b] = size(Image_Background);
 
@@ -67,12 +67,9 @@ for i=1:height
     for j=1:width
         if (Image_BackgroundSub(i,j,1) > 35) || ...
            (Image_BackgroundSub(i,j,2) > 35) || ...
-           (Image_BackgroundSub(i,j,3) > 35) %|| ...
-%            (complement(i,j,1) > 25) && ...
-%            (complement(i,j,2) > 25) && ...
-%            (complement(i,j,3) < 25)
+           (Image_BackgroundSub(i,j,3) > 35) 
             
-            %Will Show in Green
+            % Will Show in Green
             Image_BackgroundSub2(i,j,:) = [175,200,175];
         end
     end
@@ -98,7 +95,7 @@ title('Binary Image Erosion');
 
 %% Dilate Image
 % Set Morphological Operation
-SE = strel('disk',5);
+SE = strel('disk',7);
 
 Image_Dilate = imdilate(Image_Erode, SE);
 figure();
@@ -106,7 +103,7 @@ imshow(Image_Dilate);
 title('Binary Image Dilate');
 
 %% Call regionprops 
-STATS = regionprops(Image_Dilate, 'all');
+STATS = regionprops(Image_Dilate, 'all')
 % 
 % %% Print overlay
 figure();
@@ -118,38 +115,43 @@ numWashers = 0;
 for i = 1:items
     %fprintf('Perimeter: %f \t', STATS(i).Perimeter(1));
     %fprintf('Circularity: %f -->', STATS(i).Circularity(1));
-    if STATS(i).Circularity(1) > 0.65 && STATS(i).Perimeter(1) > 75 && STATS(i).Perimeter(1) < 135
-        %fprintf(' Circle :)\n');
-        numWashers = numWashers + 1;
-        x = round(STATS(i).Centroid(1));
-        y = round(STATS(i).Centroid(2));
-        red = round(Image_Background(y, x, 1));
-        green = round(Image_Background(y, x, 2));
-        blue = round(Image_Background(y, x, 3));
-        
-        pixelAtCentroid = [red, green, blue];
-        [intensity, color] = max(pixelAtCentroid);
-        
-        if color == 1
-            if abs(intensity - green) < 15
-               colorStr = 'y'; 
+    if STATS(i).Circularity(1) > 0.65
+        if STATS(i).Perimeter(1) > 75 && STATS(i).Perimeter(1) < 150
+            %fprintf(' Circle :)\n');
+            numWashers = numWashers + 1;
+            x = round(STATS(i).Centroid(1));
+            y = round(STATS(i).Centroid(2));
+            red = round(Image_Background(y, x, 1));
+            green = round(Image_Background(y, x, 2));
+            blue = round(Image_Background(y, x, 3));
+
+            pixelAtCentroid = [red, green, blue];
+            [intensity, color] = max(pixelAtCentroid);
+
+            if color == 1
+                if abs(intensity - green) < 20
+                   colorStr = 'y'; 
+                else
+                    colorStr = 'r';
+                end
+            elseif color == 2
+                if abs(intensity - red) < 20
+                   colorStr = 'y'; 
+                else
+                    colorStr = 'g';
+                end
             else
-                colorStr = 'r';
+                colorStr = 'b';
             end
-        elseif color == 2
-            if abs(intensity - red) < 15
-               colorStr = 'y'; 
-            else
-                colorStr = 'g';
-            end
+            %fprintf('%s\n', colorStr);
+            plot(STATS(i).Centroid(1),STATS(i).Centroid(2),'kO','MarkerFaceColor', colorStr);
+
+            fprintf('Washer location: (%d, %d)\n', x, y);
+            fprintf('Washer color: %s\n', colorStr);
         else
-            colorStr = 'b';
+            %fprintf(' No Circle :(\n');
+            plot(STATS(i).Centroid(1),STATS(i).Centroid(2),'kO','MarkerFaceColor','w');
         end
-        %fprintf('%s\n', colorStr);
-        plot(STATS(i).Centroid(1),STATS(i).Centroid(2),'kO','MarkerFaceColor', colorStr);
-        
-        fprintf('Washer location: (%d, %d)\n', x, y);
-        fprintf('Washer color: %s\n', colorStr);
     else
         %fprintf(' No Circle :(\n');
         plot(STATS(i).Centroid(1),STATS(i).Centroid(2),'kO','MarkerFaceColor','k');
